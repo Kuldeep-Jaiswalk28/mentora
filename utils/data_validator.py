@@ -237,3 +237,73 @@ reminder_schema = {
         'max_length': 256
     }
 }
+
+blueprint_schema = {
+    'name': {
+        'type': 'string',
+        'required': True,
+        'min_length': 1,
+        'max_length': 64
+    },
+    'description': {
+        'type': 'string',
+        'max_length': 256
+    },
+    'day_of_week': {
+        'type': 'string',
+        'enum': [None, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    },
+    'is_active': {
+        'type': 'boolean'
+    }
+}
+
+time_slot_schema = {
+    'title': {
+        'type': 'string',
+        'required': True,
+        'min_length': 1,
+        'max_length': 128
+    },
+    'description': {
+        'type': 'string'
+    },
+    'category_id': {
+        'type': 'integer',
+        'required': True
+    },
+    'start_time': {
+        'type': 'string',
+        'required': True,
+        'pattern': r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$'  # HH:MM format
+    },
+    'end_time': {
+        'type': 'string',
+        'required': True,
+        'pattern': r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$'  # HH:MM format
+    },
+    'goal_id': {
+        'type': 'integer'
+    }
+}
+
+user_preference_schema = {
+    'theme': {
+        'type': 'string',
+        'enum': ['dark', 'light', 'focus', 'study']
+    },
+    'font_size': {
+        'type': 'string',
+        'enum': ['small', 'medium', 'large']
+    },
+    'enable_voice': {
+        'type': 'boolean'
+    },
+    'daily_review_time': {
+        'type': 'string',
+        'pattern': r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$'  # HH:MM format
+    },
+    'do_not_disturb': {
+        'type': 'boolean'
+    }
+}

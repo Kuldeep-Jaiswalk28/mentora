@@ -39,72 +39,76 @@ def check_reminders():
     Check for pending reminders and trigger them
     This function is called by the scheduler every minute
     """
-    from app import db
+    from app import db, app
     
-    now = datetime.utcnow()
-    five_minutes_ago = now - timedelta(minutes=5)
-    
-    # Find pending reminders that should be triggered
-    pending_reminders = Reminder.query.filter(
-        Reminder.reminder_time <= now,
-        Reminder.reminder_time >= five_minutes_ago,
-        Reminder.triggered == False
-    ).all()
-    
-    for reminder in pending_reminders:
-        # Handle the reminder notification
-        # In a desktop app, this would trigger a system notification
-        logger.info(f"REMINDER: {reminder.message} for task '{reminder.task.title}'")
+    # Use application context to avoid "working outside of application context" error
+    with app.app_context():
+        now = datetime.utcnow()
+        five_minutes_ago = now - timedelta(minutes=5)
         
-        # Mark reminder as triggered
-        reminder.triggered = True
-        db.session.add(reminder)
-    
-    if pending_reminders:
-        db.session.commit()
-        logger.info(f"Triggered {len(pending_reminders)} reminders")
+        # Find pending reminders that should be triggered
+        pending_reminders = Reminder.query.filter(
+            Reminder.reminder_time <= now,
+            Reminder.reminder_time >= five_minutes_ago,
+            Reminder.triggered == False
+        ).all()
+        
+        for reminder in pending_reminders:
+            # Handle the reminder notification
+            # In a desktop app, this would trigger a system notification
+            logger.info(f"REMINDER: {reminder.message} for task '{reminder.task.title}'")
+            
+            # Mark reminder as triggered
+            reminder.triggered = True
+            db.session.add(reminder)
+        
+        if pending_reminders:
+            db.session.commit()
+            logger.info(f"Triggered {len(pending_reminders)} reminders")
 
 def handle_recurring_tasks():
     """
     Create new task instances for recurring tasks
     This function is called by the scheduler daily at midnight
     """
-    from app import db
+    from app import db, app
     
-    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # Find completed tasks with recurrence settings
-    completed_recurrings = Task.query.filter(
-        Task.completed == True,
-        Task.recurrence_type.isnot(None),
-        Task.recurrence_value.isnot(None)
-    ).all()
-    
-    new_tasks_count = 0
-    
-    for task in completed_recurrings:
-        if should_create_recurrence(task, today):
-            # Create a new task instance
-            new_task = Task(
-                title=task.title,
-                description=task.description,
-                goal_id=task.goal_id,
-                priority=task.priority,
-                recurrence_type=task.recurrence_type,
-                recurrence_value=task.recurrence_value,
-                parent_task_id=task.id
-            )
-            
-            # Set new deadline based on recurrence type
-            if task.deadline:
-                new_task.deadline = calculate_next_deadline(task)
-            
-            db.session.add(new_task)
-            new_tasks_count += 1
-    
-    if new_tasks_count > 0:
-        db.session.commit()
-        logger.info(f"Created {new_tasks_count} new recurring tasks")
+    # Use application context to avoid "working outside of application context" error
+    with app.app_context():
+        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Find completed tasks with recurrence settings
+        completed_recurrings = Task.query.filter(
+            Task.completed == True,
+            Task.recurrence_type.isnot(None),
+            Task.recurrence_value.isnot(None)
+        ).all()
+        
+        new_tasks_count = 0
+        
+        for task in completed_recurrings:
+            if should_create_recurrence(task, today):
+                # Create a new task instance
+                new_task = Task(
+                    title=task.title,
+                    description=task.description,
+                    goal_id=task.goal_id,
+                    priority=task.priority,
+                    recurrence_type=task.recurrence_type,
+                    recurrence_value=task.recurrence_value,
+                    parent_task_id=task.id
+                )
+                
+                # Set new deadline based on recurrence type
+                if task.deadline:
+                    new_task.deadline = calculate_next_deadline(task)
+                
+                db.session.add(new_task)
+                new_tasks_count += 1
+        
+        if new_tasks_count > 0:
+            db.session.commit()
+            logger.info(f"Created {new_tasks_count} new recurring tasks")
 
 def should_create_recurrence(task, today):
     """
