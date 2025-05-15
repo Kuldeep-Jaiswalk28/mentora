@@ -29,7 +29,7 @@ def add_cors_headers(f):
         resp = make_response(f(*args, **kwargs))
         resp.headers['Access-Control-Allow-Origin'] = '*'
         resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
         return resp
     return decorated_function
 
@@ -38,7 +38,7 @@ def add_cors_headers(f):
 def after_request(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     return response
 
 # Configure the database
@@ -78,10 +78,10 @@ def recent_activity():
 with app.app_context():
     # Import models
     import models  # noqa: F401
-    
+
     # Create all tables
     db.create_all()
-    
+
     # Register blueprints/routes
     from routes.goal_routes import goals_bp
     from routes.task_routes import tasks_bp
@@ -89,14 +89,14 @@ with app.app_context():
     from routes.reminder_routes import reminders_bp
     from routes.blueprint_routes import blueprint_bp
     from routes.mentor_routes import mentor_bp
-    
+
     app.register_blueprint(goals_bp)
     app.register_blueprint(tasks_bp)
     app.register_blueprint(categories_bp)
     app.register_blueprint(reminders_bp)
     app.register_blueprint(blueprint_bp)
     app.register_blueprint(mentor_bp)
-    
+
     # Initialize reminder scheduler
     from utils.reminder_scheduler import initialize_reminders
     initialize_reminders(scheduler)
