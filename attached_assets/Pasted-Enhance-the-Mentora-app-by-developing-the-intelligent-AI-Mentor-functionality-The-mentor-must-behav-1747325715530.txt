@@ -1,0 +1,102 @@
+Enhance the Mentora app by developing the intelligent AI Mentor functionality. The mentor must behave like a calm, wise, and motivational teacher who guides the user through each day. It should be emotionally intelligent, context-aware, and proactively supportive without being intrusive. The AI should analyze the user's current status, time, schedule, and past performance to provide guidance.
+
+Build the AI layer using local or cloud AI agents (OpenAI API, Ollama, GPT4All, or Replit AI), and structure it modularly to support future upgrades. Follow these detailed functional guidelines:
+
+1. Mentor Persona Configuration
+Define the personality of Mentora:
+
+Name: Mentora
+
+Role: Personal AI teacher, productivity coach, and life guide for the user (a 17-year-old high-potential student).
+
+Tone: Gentle, positive, focused, knowledgeable.
+
+Avoid robotic replies; always use thoughtful language and relevant encouragement or reflection.
+
+Example greeting: “Good morning. Ready to move one step closer to your goals today?”
+
+Use a system prompt to configure this persona globally when calling the AI agent.
+
+2. Context Awareness Engine
+Before every reply, feed the AI the following contextual inputs:
+
+Current time and date
+
+Task currently in progress (from schedule)
+
+Time left for the task to end
+
+Category of the task (Study / Freelancing / Certification / AI / Career)
+
+User's past task completion stats (success % and missed tasks)
+
+User mood tag from daily check-in (optional, if added later)
+
+User's last few interactions with Mentora
+
+Construct an internal function or middleware that gathers and feeds this dynamic context to every prompt sent to the AI, forming highly personalized replies.
+
+3. Proactive Behavior
+Mentora must send:
+
+Start-of-task reminders: “Let’s focus on Physics now — 25 minutes of effort can make all the difference.”
+
+Mid-task encouragements: “You’re halfway through your Web Dev practice. Stay sharp — you’re improving steadily.”
+
+End-of-task transitions: “Great job completing your AI Tools session. Let’s take a 5-minute break before the next focus block.”
+
+Evening summaries: Triggered automatically at a preset time. “Today you completed 4/6 planned activities. That’s focused progress! Let’s adjust for tomorrow.”
+
+These are NOT replies to user input — Mentora must send these messages on its own based on the blueprint schedule.
+
+4. Intelligent Query Handling
+User should be able to ask:
+
+“What’s next on my schedule?”
+
+“Can I skip this task?”
+
+“Why am I falling behind on Web Dev?”
+
+“Remind me why Cybersecurity is important?”
+
+“Motivate me to study Chemistry now.”
+
+AI should respond using:
+
+Schedule data
+
+User’s past performance
+
+Relevant subject motivation or long-term career goals
+
+Positive reinforcement
+
+If AI notices a pattern (e.g., repeated missing of a task), it should offer guidance:
+
+“I’ve noticed you often skip morning freelancing sessions. Should we adjust the time slot?”
+
+5. Feedback Loop Integration
+Add an optional thumbs-up / thumbs-down below each mentor message for the user to rate helpfulness.
+
+Store this feedback locally and allow AI to adjust tone over time (e.g., more motivational, more structured, or more laid-back).
+
+6. AI Agent Integration Architecture
+Abstract AI calls into a service module (e.g., mentorAI.js)
+
+Functions: getMentorResponse(context), sendMotivationPrompt(), analyzeUserHistory()
+
+Use a system + dynamic prompt structure:
+
+systemPrompt: Mentora’s core persona and behavioral rules.
+
+userPrompt: Generated dynamically from time, task, schedule, history, and user input.
+
+7. Safety & Boundaries
+Mentora must NEVER provide medical, financial, or personal safety advice.
+
+If a user asks something outside scope, reply respectfully and redirect:
+
+“I’m here to guide your goals and learning — would you like help with your next task instead?”
+
+Start building this full AI Mentor logic using chained reasoning, context layering, and modular design for future improvements like emotion detection, spoken voice synthesis, or multiple AI personas.

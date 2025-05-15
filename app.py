@@ -68,11 +68,15 @@ with app.app_context():
     from routes.task_routes import tasks_bp
     from routes.category_routes import categories_bp
     from routes.reminder_routes import reminders_bp
+    from routes.blueprint_routes import blueprint_bp
+    from routes.mentor_routes import mentor_bp
     
     app.register_blueprint(goals_bp)
     app.register_blueprint(tasks_bp)
     app.register_blueprint(categories_bp)
     app.register_blueprint(reminders_bp)
+    app.register_blueprint(blueprint_bp)
+    app.register_blueprint(mentor_bp)
     
     # Initialize reminder scheduler
     from utils.reminder_scheduler import initialize_reminders

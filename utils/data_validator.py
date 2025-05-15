@@ -53,6 +53,52 @@ def validate_data(data, schema):
     }
 
 
+def validate_blueprint_data(data, required=True):
+    """
+    Validate blueprint data
+    
+    Args:
+        data: Blueprint data to validate
+        required: Whether required fields are enforced
+    
+    Returns:
+        Dictionary with validation results
+    """
+    # Create a copy of the schema
+    schema = blueprint_schema.copy()
+    
+    # Modify required fields based on the required parameter
+    if not required:
+        for field in schema:
+            schema[field] = schema[field].copy()
+            schema[field]['required'] = False
+    
+    return validate_data(data, schema)
+
+
+def validate_time_slot_data(data, required=True):
+    """
+    Validate time slot data
+    
+    Args:
+        data: Time slot data to validate
+        required: Whether required fields are enforced
+    
+    Returns:
+        Dictionary with validation results
+    """
+    # Create a copy of the schema
+    schema = time_slot_schema.copy()
+    
+    # Modify required fields based on the required parameter
+    if not required:
+        for field in schema:
+            schema[field] = schema[field].copy()
+            schema[field]['required'] = False
+    
+    return validate_data(data, schema)
+
+
 def validate_field(field, value, rules):
     """
     Validate a single field value against its rules
