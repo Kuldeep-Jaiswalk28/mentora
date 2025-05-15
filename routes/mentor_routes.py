@@ -3,28 +3,38 @@ from services.mentor_ai_service import (
     get_user_response,
     generate_proactive_message, 
     should_send_proactive_message,
-    record_feedback
+    record_feedback,
+    get_all_messages
 )
 
 mentor_bp = Blueprint('mentor', __name__, url_prefix='/api/mentor')
 
-@mentor_bp.route('/chat', methods=['POST'])
+@mentor_bp.route('/chat', methods=['GET', 'POST'])
 def chat_with_mentor():
-    """Send a message to the AI mentor and get a response"""
-    if not request.is_json:
-        return jsonify({"error": "Request must be JSON"}), 400
+    """Get chat history or send a message to the AI mentor"""
+    if request.method == 'GET':
+        # Get chat history
+        messages = get_all_messages(limit=50)
+        return jsonify({
+            "messages": [message.to_dict() for message in messages]
+        })
     
-    data = request.get_json()
-    
-    if 'message' not in data or not data['message'].strip():
-        return jsonify({"error": "Message cannot be empty"}), 400
-    
-    # Get response from the AI mentor
-    response = get_user_response(data['message'])
-    
-    return jsonify({
-        "response": response
-    })
+    elif request.method == 'POST':
+        # Send a message to the AI mentor
+        if not request.is_json:
+            return jsonify({"error": "Request must be JSON"}), 400
+        
+        data = request.get_json()
+        
+        if 'message' not in data or not data['message'].strip():
+            return jsonify({"error": "Message cannot be empty"}), 400
+        
+        # Get response from the AI mentor
+        response = get_user_response(data['message'])
+        
+        return jsonify({
+            "response": response
+        })
 
 @mentor_bp.route('/proactive/<message_type>', methods=['GET'])
 def get_proactive_message(message_type):

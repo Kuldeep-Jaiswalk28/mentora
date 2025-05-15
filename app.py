@@ -59,7 +59,15 @@ scheduler.start()
 # Main route for the application
 @app.route('/')
 def index():
-    return render_template('index.html')
+    # Get current date and day for the template
+    from datetime import datetime
+    current_date = datetime.utcnow().strftime("%B %d, %Y")
+    current_day = datetime.utcnow().strftime("%A")
+    
+    # Render the index template with date info
+    return render_template('index.html', 
+                          current_date=current_date,
+                          current_day=current_day)
 
 # API route for progress data
 @app.route('/api/progress/overall')

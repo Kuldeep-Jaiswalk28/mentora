@@ -287,6 +287,26 @@ def generate_proactive_message(message_type):
     logger.info(f"Generated proactive message ({message_type}): {ai_message.id}")
     return response_text
 
+def get_all_messages(limit=100, newest_first=True):
+    """
+    Get all AI messages from the database
+    
+    Args:
+        limit: Maximum number of messages to return
+        newest_first: Order by newest first if True
+        
+    Returns:
+        List of AIMessage objects
+    """
+    query = AIMessage.query
+    
+    if newest_first:
+        query = query.order_by(AIMessage.timestamp.desc())
+    else:
+        query = query.order_by(AIMessage.timestamp)
+    
+    return query.limit(limit).all()
+
 def save_user_message(message_text):
     """
     Save a user message to the database
