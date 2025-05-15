@@ -261,11 +261,11 @@ def get_daily_advice():
         Dictionary with advice and insights
     """
     # Get progress and task data
-    from services.progress_service import get_overall_progress, get_recent_activity
+    from services.progress_service import get_overall_progress, get_recent_progress
     from utils.priority_engine import get_daily_priorities
     
     progress = get_overall_progress()
-    recent = get_recent_activity(days=3)
+    recent = get_recent_progress(days=3)
     daily_tasks = get_daily_priorities(limit=5)
     
     # Determine user's current strengths and areas for improvement

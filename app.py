@@ -52,9 +52,9 @@ def overall_progress():
 # API route for recent activity
 @app.route('/api/progress/recent')
 def recent_activity():
-    from services.progress_service import get_recent_activity
+    from services.progress_service import get_recent_progress
     from flask import jsonify
-    return jsonify(get_recent_activity())
+    return jsonify(get_recent_progress(7))  # Get last 7 days of progress
 
 with app.app_context():
     # Import models
