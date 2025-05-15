@@ -279,7 +279,7 @@ def generate_proactive_message(message_type):
     ]
     
     # Call the API
-    response_text = call_openai_api(messages)
+    response_text = call_deepseek_api(messages)
     
     # Save the interaction (as AI-initiated)
     ai_message = save_ai_message(response_text, is_proactive=True)

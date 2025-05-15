@@ -4,10 +4,15 @@ Handles business logic for schedule blueprint management
 """
 import logging
 from datetime import datetime, time
+import re
+
 from app import db
 from models import Blueprint, TimeSlot, Category, Goal
 
 logger = logging.getLogger(__name__)
+
+# Regular expression for time in HH:MM format
+TIME_REGEX = re.compile(r'^([01]?[0-9]|2[0-3]):([0-5][0-9])$')
 
 def get_all_blueprints(active_only=False):
     """
@@ -24,7 +29,7 @@ def get_all_blueprints(active_only=False):
     if active_only:
         query = query.filter_by(is_active=True)
     
-    return query.all()
+    return query.order_by(Blueprint.name).all()
 
 def get_blueprint_by_id(blueprint_id):
     """
@@ -48,12 +53,18 @@ def get_blueprint_for_day(day_of_week):
     Returns:
         Blueprint object or None if not found
     """
-    # First, try to find a specific blueprint for this day
-    blueprint = Blueprint.query.filter_by(day_of_week=day_of_week, is_active=True).first()
+    # First look for a day-specific blueprint
+    blueprint = Blueprint.query.filter_by(
+        day_of_week=day_of_week,
+        is_active=True
+    ).first()
     
-    # If no specific day blueprint, return the default (day_of_week=None) blueprint
+    # If no day-specific blueprint, look for a default one
     if not blueprint:
-        blueprint = Blueprint.query.filter_by(day_of_week=None, is_active=True).first()
+        blueprint = Blueprint.query.filter_by(
+            day_of_week=None,
+            is_active=True
+        ).first()
     
     return blueprint
 
@@ -74,13 +85,14 @@ def create_blueprint(name, description=None, day_of_week=None, is_active=True):
         name=name,
         description=description,
         day_of_week=day_of_week,
-        is_active=is_active
+        is_active=is_active,
+        created_at=datetime.utcnow()
     )
     
     db.session.add(blueprint)
     db.session.commit()
     
-    logger.info(f"Created new blueprint: {blueprint.id} - {blueprint.name}")
+    logger.info(f"Created new blueprint: {blueprint.id}")
     return blueprint
 
 def update_blueprint(blueprint_id, name=None, description=None, day_of_week=None, is_active=None):
@@ -100,10 +112,8 @@ def update_blueprint(blueprint_id, name=None, description=None, day_of_week=None
     blueprint = Blueprint.query.get(blueprint_id)
     
     if not blueprint:
-        logger.warning(f"Attempted to update non-existent blueprint with ID: {blueprint_id}")
         return None
     
-    # Update fields if provided
     if name is not None:
         blueprint.name = name
     
@@ -118,7 +128,6 @@ def update_blueprint(blueprint_id, name=None, description=None, day_of_week=None
     
     blueprint.updated_at = datetime.utcnow()
     
-    db.session.add(blueprint)
     db.session.commit()
     
     logger.info(f"Updated blueprint: {blueprint.id}")
@@ -137,10 +146,8 @@ def delete_blueprint(blueprint_id):
     blueprint = Blueprint.query.get(blueprint_id)
     
     if not blueprint:
-        logger.warning(f"Attempted to delete non-existent blueprint with ID: {blueprint_id}")
         return False
     
-    # Blueprint deletion will cascade to time slots due to relationship setup
     db.session.delete(blueprint)
     db.session.commit()
     
@@ -160,13 +167,35 @@ def get_time_slots(blueprint_id=None, category_id=None):
     """
     query = TimeSlot.query
     
-    if blueprint_id is not None:
+    if blueprint_id:
         query = query.filter_by(blueprint_id=blueprint_id)
     
-    if category_id is not None:
+    if category_id:
         query = query.filter_by(category_id=category_id)
     
     return query.order_by(TimeSlot.start_time).all()
+
+def _parse_time(time_str):
+    """
+    Parse a time string in HH:MM format
+    
+    Args:
+        time_str: Time string in HH:MM format
+        
+    Returns:
+        time object or None if invalid format
+    """
+    if isinstance(time_str, time):
+        return time_str
+    
+    match = TIME_REGEX.match(time_str)
+    if not match:
+        return None
+    
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    
+    return time(hour, minute)
 
 def create_time_slot(blueprint_id, category_id, title, start_time, end_time, description=None, goal_id=None):
     """
@@ -184,33 +213,34 @@ def create_time_slot(blueprint_id, category_id, title, start_time, end_time, des
     Returns:
         Newly created TimeSlot object
     """
-    # Ensure blueprint exists
+    # Check if blueprint exists
     blueprint = Blueprint.query.get(blueprint_id)
     if not blueprint:
-        logger.error(f"Cannot create time slot: Blueprint {blueprint_id} not found")
-        return None
+        raise ValueError(f"Blueprint with ID {blueprint_id} not found")
     
-    # Ensure category exists
+    # Check if category exists
     category = Category.query.get(category_id)
     if not category:
-        logger.error(f"Cannot create time slot: Category {category_id} not found")
-        return None
+        raise ValueError(f"Category with ID {category_id} not found")
     
-    # If goal_id provided, ensure it exists
-    if goal_id is not None:
+    # Check if goal exists (if provided)
+    if goal_id:
         goal = Goal.query.get(goal_id)
         if not goal:
-            logger.warning(f"Goal {goal_id} not found, creating time slot without goal association")
-            goal_id = None
+            raise ValueError(f"Goal with ID {goal_id} not found")
     
-    # Convert string times to time objects
-    if isinstance(start_time, str):
-        hour, minute = map(int, start_time.split(':'))
-        start_time = time(hour, minute)
+    # Parse times
+    start_time_obj = _parse_time(start_time)
+    end_time_obj = _parse_time(end_time)
     
-    if isinstance(end_time, str):
-        hour, minute = map(int, end_time.split(':'))
-        end_time = time(hour, minute)
+    if not start_time_obj:
+        raise ValueError(f"Invalid start time format: {start_time}")
+    
+    if not end_time_obj:
+        raise ValueError(f"Invalid end time format: {end_time}")
+    
+    if start_time_obj >= end_time_obj:
+        raise ValueError("End time must be after start time")
     
     # Create time slot
     time_slot = TimeSlot(
@@ -218,15 +248,16 @@ def create_time_slot(blueprint_id, category_id, title, start_time, end_time, des
         category_id=category_id,
         title=title,
         description=description,
-        start_time=start_time,
-        end_time=end_time,
-        goal_id=goal_id
+        start_time=start_time_obj,
+        end_time=end_time_obj,
+        goal_id=goal_id,
+        created_at=datetime.utcnow()
     )
     
     db.session.add(time_slot)
     db.session.commit()
     
-    logger.info(f"Created new time slot: {time_slot.id} - {time_slot.title}")
+    logger.info(f"Created new time slot: {time_slot.id}")
     return time_slot
 
 def update_time_slot(slot_id, title=None, description=None, start_time=None, end_time=None, 
@@ -249,46 +280,49 @@ def update_time_slot(slot_id, title=None, description=None, start_time=None, end
     time_slot = TimeSlot.query.get(slot_id)
     
     if not time_slot:
-        logger.warning(f"Attempted to update non-existent time slot with ID: {slot_id}")
         return None
     
-    # Update fields if provided
     if title is not None:
         time_slot.title = title
     
     if description is not None:
         time_slot.description = description
     
+    # Update start time if provided
     if start_time is not None:
-        if isinstance(start_time, str):
-            hour, minute = map(int, start_time.split(':'))
-            start_time = time(hour, minute)
-        time_slot.start_time = start_time
+        start_time_obj = _parse_time(start_time)
+        if not start_time_obj:
+            raise ValueError(f"Invalid start time format: {start_time}")
+        time_slot.start_time = start_time_obj
     
+    # Update end time if provided
     if end_time is not None:
-        if isinstance(end_time, str):
-            hour, minute = map(int, end_time.split(':'))
-            end_time = time(hour, minute)
-        time_slot.end_time = end_time
+        end_time_obj = _parse_time(end_time)
+        if not end_time_obj:
+            raise ValueError(f"Invalid end time format: {end_time}")
+        time_slot.end_time = end_time_obj
     
+    # Check that start time is before end time
+    if time_slot.start_time >= time_slot.end_time:
+        raise ValueError("End time must be after start time")
+    
+    # Update category if provided
     if category_id is not None:
-        # Ensure category exists
-        if Category.query.get(category_id):
-            time_slot.category_id = category_id
-        else:
-            logger.warning(f"Cannot update time slot: Category {category_id} not found")
+        category = Category.query.get(category_id)
+        if not category:
+            raise ValueError(f"Category with ID {category_id} not found")
+        time_slot.category_id = category_id
     
+    # Update goal if provided
     if goal_id is not None:
-        # Handle null case specially
-        if goal_id == 0:
+        if goal_id == 0:  # Allow removing goal association
             time_slot.goal_id = None
-        # Ensure goal exists if not null
-        elif Goal.query.get(goal_id):
-            time_slot.goal_id = goal_id
         else:
-            logger.warning(f"Cannot update time slot: Goal {goal_id} not found")
+            goal = Goal.query.get(goal_id)
+            if not goal:
+                raise ValueError(f"Goal with ID {goal_id} not found")
+            time_slot.goal_id = goal_id
     
-    db.session.add(time_slot)
     db.session.commit()
     
     logger.info(f"Updated time slot: {time_slot.id}")
@@ -307,7 +341,6 @@ def delete_time_slot(slot_id):
     time_slot = TimeSlot.query.get(slot_id)
     
     if not time_slot:
-        logger.warning(f"Attempted to delete non-existent time slot with ID: {slot_id}")
         return False
     
     db.session.delete(time_slot)
@@ -324,31 +357,56 @@ def get_today_schedule():
         Dictionary with schedule details for today
     """
     today = datetime.utcnow()
-    day_name = today.strftime('%A')  # e.g., Monday, Tuesday
+    day_of_week = today.strftime('%A')  # Monday, Tuesday, etc.
     
     # Get blueprint for today
-    blueprint = get_blueprint_for_day(day_name)
+    blueprint = get_blueprint_for_day(day_of_week)
     
+    # If no blueprint, return empty schedule
     if not blueprint:
         return {
             'date': today.strftime('%Y-%m-%d'),
-            'day_of_week': day_name,
+            'day_of_week': day_of_week,
             'has_schedule': False,
-            'message': 'No schedule blueprint defined for today',
+            'blueprint_id': None,
+            'blueprint_name': None,
             'time_slots': []
         }
     
-    # Get time slots ordered by start time
+    # Get time slots for this blueprint
     time_slots = get_time_slots(blueprint_id=blueprint.id)
+    
+    # Format time slots
+    formatted_slots = []
+    for slot in time_slots:
+        # Get category details
+        category = Category.query.get(slot.category_id)
+        
+        # Get goal details if associated
+        goal = None
+        if slot.goal_id:
+            goal = Goal.query.get(slot.goal_id)
+        
+        formatted_slots.append({
+            'id': slot.id,
+            'title': slot.title,
+            'description': slot.description,
+            'start_time': slot.start_time.strftime('%H:%M'),
+            'end_time': slot.end_time.strftime('%H:%M'),
+            'category_id': slot.category_id,
+            'category_name': category.name if category else None,
+            'category_color': category.color if category else None,
+            'goal_id': slot.goal_id,
+            'goal_title': goal.title if goal else None
+        })
     
     return {
         'date': today.strftime('%Y-%m-%d'),
-        'day_of_week': day_name,
+        'day_of_week': day_of_week,
         'has_schedule': True,
         'blueprint_id': blueprint.id,
         'blueprint_name': blueprint.name,
-        'blueprint_description': blueprint.description,
-        'time_slots': [slot.to_dict() for slot in time_slots]
+        'time_slots': formatted_slots
     }
 
 def get_default_blueprint():
@@ -358,79 +416,50 @@ def get_default_blueprint():
     Returns:
         Blueprint object
     """
-    # Check if there's already a default blueprint
-    default = Blueprint.query.filter_by(day_of_week=None, is_active=True).first()
+    # Look for an existing default blueprint
+    default = Blueprint.query.filter_by(name='Default Schedule').first()
     
+    # If it exists, return it
     if default:
         return default
     
     # Create a new default blueprint
     default = create_blueprint(
-        name="Default Daily Schedule",
-        description="Default schedule for a balanced productive day",
+        name='Default Schedule',
+        description='Default daily schedule',
         day_of_week=None,
         is_active=True
     )
     
-    # Get categories
-    from services.category_service import get_all_categories, get_default_categories
-    categories = get_all_categories()
-    
-    if not categories:
-        categories = get_default_categories()
-    
-    # Map of category names to objects
-    category_map = {category.name: category for category in categories}
-    
-    # Add default time slots
-    if 'Study' in category_map:
-        create_time_slot(
-            blueprint_id=default.id,
-            category_id=category_map['Study'].id,
-            title="Morning Study Session",
-            description="Focus on the most challenging subjects",
-            start_time="08:00",
-            end_time="10:00"
+    # Create default time slots
+    # First, get the Study category (or create it if it doesn't exist)
+    study_category = Category.query.filter_by(name='Study').first()
+    if not study_category:
+        study_category = Category(
+            name='Study',
+            description='Academic pursuits and learning',
+            color='#4a69bd'
         )
-        
-        create_time_slot(
-            blueprint_id=default.id,
-            category_id=category_map['Study'].id,
-            title="Afternoon Review",
-            description="Review and practice problems",
-            start_time="14:00",
-            end_time="15:30"
-        )
+        db.session.add(study_category)
+        db.session.commit()
     
-    if 'Freelancing' in category_map:
-        create_time_slot(
-            blueprint_id=default.id,
-            category_id=category_map['Freelancing'].id,
-            title="Freelance Work",
-            description="Focus on client projects",
-            start_time="10:30",
-            end_time="12:30"
-        )
+    # Create some default time slots for a productive day
+    create_time_slot(
+        blueprint_id=default.id,
+        category_id=study_category.id,
+        title='Morning Study Session',
+        start_time='08:00',
+        end_time='10:00',
+        description='Focused study time for your most important subject'
+    )
     
-    if 'AI Tools' in category_map:
-        create_time_slot(
-            blueprint_id=default.id,
-            category_id=category_map['AI Tools'].id,
-            title="AI Practice Session",
-            description="Practice using AI tools and learning new techniques",
-            start_time="16:00",
-            end_time="17:30"
-        )
+    create_time_slot(
+        blueprint_id=default.id,
+        category_id=study_category.id,
+        title='Afternoon Study Session',
+        start_time='14:00',
+        end_time='16:00',
+        description='Review and practice exercises'
+    )
     
-    if 'Certifications' in category_map:
-        create_time_slot(
-            blueprint_id=default.id,
-            category_id=category_map['Certifications'].id,
-            title="Certification Prep",
-            description="Study for upcoming certifications",
-            start_time="19:00",
-            end_time="20:30"
-        )
-    
-    logger.info(f"Created default blueprint with {default.time_slots.count()} time slots")
     return default
