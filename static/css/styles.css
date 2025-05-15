@@ -1,0 +1,215 @@
+/* Main Layout Styles */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.15) !important;
+}
+
+/* Schedule Timeline Styles */
+.time-slot {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    border-left: 4px solid;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.time-slot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.time-label {
+    font-weight: bold;
+}
+
+.time-slot-title {
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.time-slot-description {
+    font-size: 0.875rem;
+    opacity: 0.8;
+}
+
+.current-slot {
+    box-shadow: 0 0 0 1px var(--bs-primary), 0 4px 8px rgba(0,0,0,0.1);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(var(--bs-primary-rgb), 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(var(--bs-primary-rgb), 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(var(--bs-primary-rgb), 0);
+    }
+}
+
+/* Streak Calendar Styles */
+.streak-calendar {
+    padding: 10px 0;
+}
+
+.streak-day {
+    text-align: center;
+}
+
+.day-label {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-bottom: 5px;
+}
+
+.streak-circle {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: var(--bs-dark);
+    border: 2px solid var(--bs-secondary);
+    display: inline-block;
+}
+
+.streak-circle.completed {
+    background-color: var(--bs-success);
+    border-color: var(--bs-success);
+}
+
+.streak-circle.today {
+    border-color: var(--bs-primary);
+    border-width: 3px;
+}
+
+/* Category Progress Styles */
+.category-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.category-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    margin-right: 10px;
+}
+
+.category-info {
+    flex-grow: 1;
+}
+
+.category-name {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+    margin-bottom: 3px;
+}
+
+.category-progress-bar {
+    height: 5px;
+    background-color: var(--bs-dark);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.category-progress-value {
+    height: 100%;
+    background-color: var(--bs-primary);
+}
+
+/* Chat Styles */
+.chat-messages {
+    height: 300px;
+    overflow-y: auto;
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+}
+
+.message {
+    margin-bottom: 15px;
+    max-width: 80%;
+    padding: 10px 15px;
+    border-radius: 10px;
+    position: relative;
+}
+
+.user-message {
+    background-color: var(--bs-primary);
+    color: white;
+    align-self: flex-end;
+    margin-left: auto;
+    border-bottom-right-radius: 0;
+}
+
+.ai-message {
+    background-color: var(--bs-secondary-bg);
+    border-bottom-left-radius: 0;
+    margin-right: auto;
+}
+
+.message-time {
+    font-size: 0.7rem;
+    opacity: 0.7;
+    text-align: right;
+    margin-top: 5px;
+}
+
+.message-feedback {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.feedback-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: 0.8rem;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.feedback-btn:hover {
+    opacity: 1;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+    padding: 20px 0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bs-dark);
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--bs-secondary);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--bs-primary);
+}
