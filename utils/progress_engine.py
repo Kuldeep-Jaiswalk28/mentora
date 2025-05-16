@@ -1,556 +1,377 @@
 """
-Progress Engine for the Mentora application
-Implements automatic task logging, progress metrics, and analytics
+Progress Engine for Mentora application
+Analyzes user progress patterns and provides intelligent insights
 """
-import json
 import logging
 from datetime import datetime, timedelta
-from enum import Enum
-import os
 
 from app import db
-from models import Task, Goal, Category, TimeSlot, Blueprint
+from models import Task, Goal, Category, TimeSlot
 
 logger = logging.getLogger(__name__)
 
-# Ensure the logs directory exists
-LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
-if not os.path.exists(LOGS_DIR):
-    os.makedirs(LOGS_DIR)
-
-
-class TaskStatus(Enum):
-    """Enum for task status"""
-    NOT_STARTED = "not_started"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    MISSED = "missed"
-
+# Progress log cache
+daily_progress_logs = []
 
 def log_daily_progress():
     """
-    Log daily progress automatically
-    Should be called at the end of each day
+    Log progress data for today
+    This is called automatically at the end of each day
     """
     today = datetime.utcnow().date()
-    log_progress_for_date(today)
-
-
-def log_progress_for_date(date):
-    """
-    Log progress for a specific date
+    metrics = get_daily_metrics(today)
     
-    Args:
-        date: The date to log progress for
-    """
-    # Convert date to datetime objects for start and end of day
-    day_start = datetime.combine(date, datetime.min.time())
-    day_end = datetime.combine(date, datetime.max.time())
+    # Add to progress logs
+    daily_progress_logs.append({
+        "date": today.isoformat(),
+        "metrics": metrics
+    })
     
-    # Get the blueprint for this day
-    day_of_week = day_start.strftime('%A')  # Monday, Tuesday, etc.
-    
-    # Get blueprint for today
-    blueprint = None
-    day_blueprint = Blueprint.query.filter_by(
-        day_of_week=day_of_week,
-        is_active=True
-    ).first()
-    
-    if day_blueprint:
-        blueprint = day_blueprint
-    else:
-        # Fallback to default blueprint
-        blueprint = Blueprint.query.filter_by(
-            day_of_week=None,
-            is_active=True
-        ).first()
-    
-    if not blueprint:
-        logger.warning(f"No blueprint found for {day_of_week}. Skipping progress logging.")
-        return
-    
-    # Get time slots for this blueprint
-    time_slots = TimeSlot.query.filter_by(blueprint_id=blueprint.id).all()
-    
-    # If no time slots, nothing to log
-    if not time_slots:
-        logger.warning(f"No time slots found for blueprint {blueprint.id}. Skipping progress logging.")
-        return
-    
-    # Get tasks that were due on this day
-    tasks_due = Task.query.filter(
-        Task.deadline.between(day_start, day_end)
-    ).all()
-    
-    # Get tasks that were completed on this day
-    tasks_completed = Task.query.filter(
-        Task.completion_date.between(day_start, day_end)
-    ).all()
-    
-    # Initialize task status map for all time slots
-    task_statuses = []
-    
-    # Process each time slot
-    for slot in time_slots:
-        # Try to find a matching task
-        matching_task = None
-        
-        # If slot has an associated goal, look for tasks from that goal
-        if slot.goal_id:
-            for task in tasks_due:
-                if task.goal_id == slot.goal_id:
-                    matching_task = task
-                    break
-        
-        # If no matching task found by goal, try to find by category
-        if not matching_task:
-            category = Category.query.get(slot.category_id)
-            
-            for task in tasks_due:
-                task_goal = Goal.query.get(task.goal_id)
-                if task_goal and task_goal.category_id == slot.category_id:
-                    matching_task = task
-                    break
-        
-        # Determine the status of this time slot
-        status = TaskStatus.NOT_STARTED.value
-        
-        if matching_task:
-            if matching_task.completed:
-                status = TaskStatus.COMPLETED.value
-            else:
-                # If the end time of this slot is in the past, it's missed
-                slot_end_time = datetime.combine(date, slot.end_time)
-                if datetime.utcnow() > slot_end_time:
-                    status = TaskStatus.MISSED.value
-                # If the start time is past but end time is not, it's in progress
-                elif datetime.utcnow() > datetime.combine(date, slot.start_time):
-                    status = TaskStatus.IN_PROGRESS.value
-        else:
-            # No matching task, but we still need to track the time slot
-            slot_end_time = datetime.combine(date, slot.end_time)
-            if datetime.utcnow() > slot_end_time:
-                status = TaskStatus.MISSED.value
-            elif datetime.utcnow() > datetime.combine(date, slot.start_time):
-                status = TaskStatus.IN_PROGRESS.value
-        
-        # Get category
-        category = Category.query.get(slot.category_id)
-        category_name = category.name if category else "Uncategorized"
-        
-        # Get goal if associated
-        goal = None
-        if slot.goal_id:
-            goal = Goal.query.get(slot.goal_id)
-        
-        # Create a log entry
-        task_entry = {
-            "name": slot.title,
-            "category": category_name,
-            "status": status,
-            "start": slot.start_time.strftime('%H:%M'),
-            "end": slot.end_time.strftime('%H:%M'),
-            "goal_id": slot.goal_id,
-            "goal_title": goal.title if goal else None
-        }
-        
-        task_statuses.append(task_entry)
-    
-    # Create the daily log
-    log_data = {
-        "date": date.strftime('%Y-%m-%d'),
-        "tasks": task_statuses
-    }
-    
-    # Save to JSON file
-    log_file = os.path.join(LOGS_DIR, f"progress_{date.strftime('%Y-%m-%d')}.json")
-    with open(log_file, 'w') as f:
-        json.dump(log_data, f, indent=2)
-    
-    logger.info(f"Progress logged for {date.strftime('%Y-%m-%d')} with {len(task_statuses)} tasks")
-    
-    return log_data
-
+    logger.info(f"Daily progress logged for {today.isoformat()}")
+    return metrics
 
 def get_daily_metrics(date=None):
     """
     Get metrics for a specific day
     
     Args:
-        date: The date to get metrics for, or today if None
+        date: The date to get metrics for, defaults to today
     
     Returns:
-        Dictionary with metrics
+        Dictionary of metrics
     """
     if date is None:
         date = datetime.utcnow().date()
     
-    # Try to load from log file first
-    log_file = os.path.join(LOGS_DIR, f"progress_{date.strftime('%Y-%m-%d')}.json")
+    day_start = datetime.combine(date, datetime.min.time())
+    day_end = datetime.combine(date, datetime.max.time())
     
-    if os.path.exists(log_file):
-        with open(log_file, 'r') as f:
-            log_data = json.load(f)
-    else:
-        # Generate log if it doesn't exist
-        log_data = log_progress_for_date(date)
-        
-        if not log_data:
-            # If we couldn't generate a log, return empty metrics
-            return {
-                "date": date.strftime('%Y-%m-%d'),
-                "total_tasks": 0,
-                "completed_tasks": 0,
-                "completion_rate": 0,
-                "missed_tasks": 0,
-                "in_progress_tasks": 0,
-                "not_started_tasks": 0,
-                "categories": {},
-                "top_category": None
-            }
+    # Get task metrics
+    total_tasks = Task.query.filter(
+        Task.deadline.between(day_start, day_end)
+    ).count()
     
-    # Process metrics
-    tasks = log_data["tasks"]
-    total_tasks = len(tasks)
-    completed_tasks = sum(1 for task in tasks if task["status"] == TaskStatus.COMPLETED.value)
-    missed_tasks = sum(1 for task in tasks if task["status"] == TaskStatus.MISSED.value)
-    in_progress_tasks = sum(1 for task in tasks if task["status"] == TaskStatus.IN_PROGRESS.value)
-    not_started_tasks = sum(1 for task in tasks if task["status"] == TaskStatus.NOT_STARTED.value)
+    completed_tasks = Task.query.filter(
+        Task.deadline.between(day_start, day_end),
+        Task.completed == True
+    ).count()
     
+    completed_today = Task.query.filter(
+        Task.completion_date.between(day_start, day_end)
+    ).count()
+    
+    # Get goal metrics
+    active_goals = Goal.query.filter_by(completed=False).count()
+    completed_goals = Goal.query.filter(
+        Goal.updated_at.between(day_start, day_end),
+        Goal.completed == True
+    ).count()
+    
+    # Calculate time spent (based on time slots)
+    time_spent = 0
+    time_slots = TimeSlot.query.all()
+    for slot in time_slots:
+        # Convert time objects to datetime for calculation
+        start = datetime.combine(date, slot.start_time)
+        end = datetime.combine(date, slot.end_time)
+        duration = (end - start).seconds / 3600  # in hours
+        time_spent += duration
+    
+    # Calculate completion rate
     completion_rate = 0
     if total_tasks > 0:
         completion_rate = (completed_tasks / total_tasks) * 100
     
-    # Category-specific metrics
-    categories = {}
-    for task in tasks:
-        category = task["category"]
-        
-        if category not in categories:
-            categories[category] = {
-                "total": 0,
-                "completed": 0,
-                "completion_rate": 0
-            }
-        
-        categories[category]["total"] += 1
-        
-        if task["status"] == TaskStatus.COMPLETED.value:
-            categories[category]["completed"] += 1
+    # Get time spent by category
+    time_by_category = {}
+    categories = Category.query.all()
     
-    # Calculate completion rate for each category
     for category in categories:
-        if categories[category]["total"] > 0:
-            categories[category]["completion_rate"] = (
-                categories[category]["completed"] / categories[category]["total"]
-            ) * 100
+        category_slots = TimeSlot.query.filter_by(category_id=category.id).all()
+        category_time = 0
+        
+        for slot in category_slots:
+            start = datetime.combine(date, slot.start_time)
+            end = datetime.combine(date, slot.end_time)
+            duration = (end - start).seconds / 3600  # in hours
+            category_time += duration
+        
+        time_by_category[category.name] = category_time
     
-    # Determine top category
-    top_category = None
-    top_completion_rate = -1
+    # Gather overdue tasks
+    overdue_tasks = Task.query.filter(
+        Task.deadline < day_start,
+        Task.completed == False
+    ).count()
     
-    for category, stats in categories.items():
-        if stats["completion_rate"] > top_completion_rate and stats["total"] > 0:
-            top_completion_rate = stats["completion_rate"]
-            top_category = category
-    
-    return {
-        "date": date.strftime('%Y-%m-%d'),
+    # Create metrics dictionary
+    metrics = {
+        "date": date.isoformat(),
         "total_tasks": total_tasks,
         "completed_tasks": completed_tasks,
-        "completion_rate": completion_rate,
-        "missed_tasks": missed_tasks,
-        "in_progress_tasks": in_progress_tasks,
-        "not_started_tasks": not_started_tasks,
-        "categories": categories,
-        "top_category": top_category
+        "completed_today": completed_today,
+        "completion_rate": round(completion_rate, 1),
+        "active_goals": active_goals,
+        "completed_goals": completed_goals,
+        "time_spent": round(time_spent, 1),
+        "time_by_category": time_by_category,
+        "overdue_tasks": overdue_tasks
     }
-
+    
+    return metrics
 
 def get_weekly_metrics(end_date=None, days=7):
     """
     Get metrics for a week
     
     Args:
-        end_date: The end date of the week, or today if None
-        days: Number of days to include
+        end_date: The end date of the week, defaults to today
+        days: Number of days to include, defaults to 7
     
     Returns:
-        Dictionary with weekly metrics
+        Dictionary of weekly metrics
     """
     if end_date is None:
         end_date = datetime.utcnow().date()
     
-    # Get metrics for each day
-    daily_metrics = []
+    start_date = end_date - timedelta(days=days-1)
     
-    for i in range(days - 1, -1, -1):
-        date = end_date - timedelta(days=i)
-        metrics = get_daily_metrics(date)
-        daily_metrics.append(metrics)
+    # Initialize metrics
+    weekly_metrics = {
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "daily_metrics": [],
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "completion_rate": 0,
+        "completed_goals": 0,
+        "total_time_spent": 0,
+        "most_productive_day": None,
+        "least_productive_day": None,
+        "time_by_category": {},
+        "streak": get_current_streak()
+    }
     
-    # Calculate weekly totals
-    total_tasks = sum(day["total_tasks"] for day in daily_metrics)
-    completed_tasks = sum(day["completed_tasks"] for day in daily_metrics)
-    missed_tasks = sum(day["missed_tasks"] for day in daily_metrics)
+    # Get daily metrics for each day
+    current_date = start_date
+    most_completed = 0
+    least_completed = float('inf')
     
-    completion_rate = 0
-    if total_tasks > 0:
-        completion_rate = (completed_tasks / total_tasks) * 100
+    while current_date <= end_date:
+        daily_metrics = get_daily_metrics(current_date)
+        weekly_metrics["daily_metrics"].append(daily_metrics)
+        
+        # Update weekly totals
+        weekly_metrics["total_tasks"] += daily_metrics["total_tasks"]
+        weekly_metrics["completed_tasks"] += daily_metrics["completed_tasks"]
+        weekly_metrics["completed_goals"] += daily_metrics["completed_goals"]
+        weekly_metrics["total_time_spent"] += daily_metrics["time_spent"]
+        
+        # Update time by category
+        for category, time in daily_metrics["time_by_category"].items():
+            if category in weekly_metrics["time_by_category"]:
+                weekly_metrics["time_by_category"][category] += time
+            else:
+                weekly_metrics["time_by_category"][category] = time
+        
+        # Check for most/least productive day
+        if daily_metrics["completed_tasks"] > most_completed:
+            most_completed = daily_metrics["completed_tasks"]
+            weekly_metrics["most_productive_day"] = daily_metrics["date"]
+        
+        if daily_metrics["total_tasks"] > 0 and daily_metrics["completed_tasks"] < least_completed:
+            least_completed = daily_metrics["completed_tasks"]
+            weekly_metrics["least_productive_day"] = daily_metrics["date"]
+        
+        current_date += timedelta(days=1)
     
-    # Calculate streak (consecutive days with at least one completed task)
+    # Calculate weekly completion rate
+    if weekly_metrics["total_tasks"] > 0:
+        weekly_metrics["completion_rate"] = round(
+            (weekly_metrics["completed_tasks"] / weekly_metrics["total_tasks"]) * 100, 1
+        )
+    
+    # Round time spent
+    weekly_metrics["total_time_spent"] = round(weekly_metrics["total_time_spent"], 1)
+    
+    # Round time by category
+    for category in weekly_metrics["time_by_category"]:
+        weekly_metrics["time_by_category"][category] = round(
+            weekly_metrics["time_by_category"][category], 1
+        )
+    
+    return weekly_metrics
+
+def get_current_streak():
+    """
+    Calculate the current streak (consecutive days with completed tasks)
+    
+    Returns:
+        Integer representing streak days
+    """
     streak = 0
+    current_date = datetime.utcnow().date()
     
-    for day in reversed(daily_metrics):
-        if day["completed_tasks"] > 0:
+    # Check backwards from yesterday
+    check_date = current_date - timedelta(days=1)
+    
+    while True:
+        day_start = datetime.combine(check_date, datetime.min.time())
+        day_end = datetime.combine(check_date, datetime.max.time())
+        
+        # Get tasks completed on this day
+        completed_tasks = Task.query.filter(
+            Task.completion_date.between(day_start, day_end)
+        ).count()
+        
+        if completed_tasks > 0:
             streak += 1
+            check_date -= timedelta(days=1)
         else:
             break
     
-    # Category-specific metrics
-    categories = {}
+    # Add today if there are completed tasks
+    today_start = datetime.combine(current_date, datetime.min.time())
+    today_end = datetime.combine(current_date, datetime.max.time())
     
-    for day in daily_metrics:
-        for category, stats in day["categories"].items():
-            if category not in categories:
-                categories[category] = {
-                    "total": 0,
-                    "completed": 0,
-                    "completion_rate": 0
-                }
-            
-            categories[category]["total"] += stats["total"]
-            categories[category]["completed"] += stats["completed"]
+    today_completed = Task.query.filter(
+        Task.completion_date.between(today_start, today_end)
+    ).count()
     
-    # Calculate completion rate for each category
-    for category in categories:
-        if categories[category]["total"] > 0:
-            categories[category]["completion_rate"] = (
-                categories[category]["completed"] / categories[category]["total"]
-            ) * 100
+    if today_completed > 0:
+        streak += 1
     
-    # Determine best and worst categories
-    best_category = None
-    best_completion_rate = -1
-    worst_category = None
-    worst_completion_rate = 101
-    
-    for category, stats in categories.items():
-        if stats["completion_rate"] > best_completion_rate and stats["total"] >= 3:
-            best_completion_rate = stats["completion_rate"]
-            best_category = category
-        
-        if stats["completion_rate"] < worst_completion_rate and stats["total"] >= 3:
-            worst_completion_rate = stats["completion_rate"]
-            worst_category = category
-    
-    # Calculate consistency score
-    consistency_score = completion_rate
-    
-    # Generate insights
-    insights = []
-    
-    if best_category:
-        insights.append(f"Your {best_category} tasks had a {best_completion_rate:.1f}% completion rate this week — excellent!")
-    
-    if worst_category and worst_completion_rate < 70:
-        insights.append(f"{worst_category} tasks had only {worst_completion_rate:.1f}% completion. Let's plan a better schedule or adjust timing?")
-    
-    if streak >= 3:
-        insights.append(f"You're on a {streak}-day streak! Keep it up!")
-    
-    if completion_rate >= 80:
-        insights.append(f"Great job this week with {completion_rate:.1f}% overall completion!")
-    elif completion_rate >= 50:
-        insights.append(f"Solid effort with {completion_rate:.1f}% completion. Let's push for 80% next week!")
-    else:
-        insights.append(f"This week was challenging with {completion_rate:.1f}% completion. Let's simplify your schedule for better results.")
-    
-    return {
-        "start_date": (end_date - timedelta(days=days-1)).strftime('%Y-%m-%d'),
-        "end_date": end_date.strftime('%Y-%m-%d'),
-        "total_tasks": total_tasks,
-        "completed_tasks": completed_tasks,
-        "missed_tasks": missed_tasks,
-        "completion_rate": completion_rate,
-        "streak": streak,
-        "consistency_score": consistency_score,
-        "categories": categories,
-        "best_category": best_category,
-        "worst_category": worst_category,
-        "daily_metrics": daily_metrics,
-        "insights": insights
-    }
-
+    return streak
 
 def get_nudge_for_current_status():
     """
-    Generate a smart nudge based on current status
+    Generate a smart nudge based on the user's current progress status
     
     Returns:
-        Dictionary with nudge data or None if no nudge needed
+        String containing the nudge message
     """
+    # Get today's metrics
     today = datetime.utcnow().date()
-    now = datetime.utcnow()
+    today_metrics = get_daily_metrics(today)
     
-    # Get today's blueprint and time slots
-    day_of_week = now.strftime('%A')
+    # Get yesterday's metrics
+    yesterday = today - timedelta(days=1)
+    yesterday_metrics = get_daily_metrics(yesterday)
     
-    # Get blueprint for today
-    blueprint = None
-    day_blueprint = Blueprint.query.filter_by(
-        day_of_week=day_of_week,
-        is_active=True
-    ).first()
+    # Check for idle pattern (no tasks completed today)
+    if today_metrics["completed_today"] == 0:
+        # If we have overdue tasks, nudge about those
+        if today_metrics["overdue_tasks"] > 0:
+            return (f"You have {today_metrics['overdue_tasks']} overdue task{'s' if today_metrics['overdue_tasks'] > 1 else ''}. "
+                    f"Let's tackle at least one of them today!")
+        # Otherwise, encourage starting a task
+        elif today_metrics["total_tasks"] > 0:
+            return "You haven't completed any tasks today. Can you start with a small one to build momentum?"
+        else:
+            return "No tasks for today. This might be a good time to plan ahead or work on a bigger goal."
     
-    if day_blueprint:
-        blueprint = day_blueprint
+    # Check for procrastination pattern (many tasks due soon)
+    due_soon = Task.query.filter(
+        Task.deadline < datetime.utcnow() + timedelta(days=2),
+        Task.completed == False
+    ).count()
+    
+    if due_soon > 3:
+        return (f"You have {due_soon} tasks due in the next 48 hours. "
+                f"Consider prioritizing the most important ones.")
+    
+    # Check for burnout risk (high activity for several days)
+    if today_metrics["completed_today"] > 5 and yesterday_metrics["completed_tasks"] > 5:
+        return "You've been extremely productive lately. Remember to take breaks to avoid burnout."
+    
+    # Check for strong momentum (increasing completion rate)
+    if (today_metrics["completion_rate"] > 70 and 
+        today_metrics["completion_rate"] > yesterday_metrics["completion_rate"] + 10):
+        return "Great momentum today! You're making excellent progress on your tasks."
+    
+    # Check for streak milestone
+    streak = get_current_streak()
+    if streak > 0 and streak % 3 == 0:
+        return f"You're on a {streak}-day streak! Keep it up to build consistency."
+    
+    # Default encouragement based on completion rate
+    if today_metrics["completion_rate"] < 30:
+        return "You still have several tasks remaining today. Which one feels most doable right now?"
+    elif today_metrics["completion_rate"] < 70:
+        return "You're making good progress today. What's your next priority?"
     else:
-        # Fallback to default blueprint
-        blueprint = Blueprint.query.filter_by(
-            day_of_week=None,
-            is_active=True
-        ).first()
-    
-    if not blueprint:
-        return None
-    
-    # Get time slots for this blueprint
-    time_slots = TimeSlot.query.filter_by(blueprint_id=blueprint.id).all()
-    
-    if not time_slots:
-        return None
-    
-    # Find current and next time slots
-    current_slot = None
-    next_slot = None
-    
-    # Sort time slots by start time
-    sorted_slots = sorted(time_slots, key=lambda x: x.start_time)
-    
-    current_time = now.time()
-    
-    for i, slot in enumerate(sorted_slots):
-        # Check if current time is within this slot
-        if slot.start_time <= current_time < slot.end_time:
-            current_slot = slot
-            
-            # Next slot is the next one in the list
-            if i < len(sorted_slots) - 1:
-                next_slot = sorted_slots[i + 1]
-            
-            break
-        
-        # If we haven't found the current slot and this slot starts in the future
-        if current_slot is None and current_time < slot.start_time:
-            next_slot = slot
-            break
-    
-    # Generate nudge based on current context
-    nudge = None
-    
-    # Get daily metrics
-    metrics = get_daily_metrics()
-    
-    # Case 1: Current slot is ending soon (within 5 minutes)
-    if current_slot:
-        end_time_dt = datetime.combine(today, current_slot.end_time)
-        minutes_left = (end_time_dt - now).total_seconds() / 60
-        
-        if 0 < minutes_left <= 5:
-            category = Category.query.get(current_slot.category_id)
-            category_name = category.name if category else "this task"
-            
-            nudge = {
-                "type": "end_task",
-                "message": f"Wrapping up {current_slot.title} in {int(minutes_left)} minutes. " +
-                          (f"Get ready for {next_slot.title} next!" if next_slot else "You'll have a break after this!"),
-                "task": current_slot.title,
-                "category": category_name,
-                "emoji": "⏰"
-            }
-    
-    # Case 2: Next slot is starting soon (within 5 minutes)
-    elif next_slot:
-        start_time_dt = datetime.combine(today, next_slot.start_time)
-        minutes_until = (start_time_dt - now).total_seconds() / 60
-        
-        if 0 < minutes_until <= 5:
-            category = Category.query.get(next_slot.category_id)
-            category_name = category.name if category else "this task"
-            
-            nudge = {
-                "type": "start_task",
-                "message": f"{next_slot.title} starts in {int(minutes_until)} minutes. " +
-                          f"Get ready for focused {category_name} time!",
-                "task": next_slot.title,
-                "category": category_name,
-                "emoji": "🚀"
-            }
-    
-    # Case 3: Multiple completed tasks today (congratulate)
-    elif metrics["completed_tasks"] >= 3 and metrics["completion_rate"] >= 75:
-        nudge = {
-            "type": "progress",
-            "message": f"You've completed {metrics['completed_tasks']} tasks today - that's {metrics['completion_rate']:.1f}% of your schedule! Excellent momentum!",
-            "completion_rate": metrics["completion_rate"],
-            "emoji": "🔥"
-        }
-    
-    # Case 4: Multiple missed tasks (gentle reminder)
-    elif metrics["missed_tasks"] >= 2:
-        nudge = {
-            "type": "missed",
-            "message": f"You've missed {metrics['missed_tasks']} tasks today. Would you like to reschedule or adjust your blueprint?",
-            "missed_count": metrics["missed_tasks"],
-            "emoji": "🤔"
-        }
-    
-    return nudge
-
+        return "You've completed most of your tasks for today. Great job staying on track!"
 
 def generate_weekly_report():
     """
-    Generate a complete weekly report
+    Generate a comprehensive weekly report
     
     Returns:
-        String with formatted weekly report
+        String containing the report
     """
     # Get weekly metrics
-    metrics = get_weekly_metrics()
+    end_date = datetime.utcnow().date()
+    weekly_metrics = get_weekly_metrics(end_date)
     
-    # Format the report
-    report = f"""📅 Week Summary: {metrics['start_date']} – {metrics['end_date']}
-
-✅ Tasks Completed: {metrics['completed_tasks']} / {metrics['total_tasks']} ({metrics['completion_rate']:.1f}%)
-🔁 Missed Tasks: {metrics['missed_tasks']}"""
+    # Format dates
+    start_date = datetime.strptime(weekly_metrics["start_date"], "%Y-%m-%d").strftime("%B %d")
+    end_date_str = datetime.strptime(weekly_metrics["end_date"], "%Y-%m-%d").strftime("%B %d, %Y")
     
-    if metrics['best_category']:
-        best_rate = metrics['categories'][metrics['best_category']]['completion_rate']
-        report += f"\n🧠 Best Focused Area: {metrics['best_category']} ({best_rate:.1f}% completion)"
+    # Build the report
+    report = f"# Weekly Progress Report: {start_date} - {end_date_str}\n\n"
     
-    if metrics['worst_category']:
-        worst_rate = metrics['categories'][metrics['worst_category']]['completion_rate']
-        report += f"\n⚠️ Attention Needed: {metrics['worst_category']} ({worst_rate:.1f}% completion)"
+    # Overall stats
+    report += "## Overall Progress\n"
+    report += f"* Completed {weekly_metrics['completed_tasks']} of {weekly_metrics['total_tasks']} tasks "
+    report += f"({weekly_metrics['completion_rate']}% completion rate)\n"
+    report += f"* Achieved {weekly_metrics['completed_goals']} goals\n"
+    report += f"* Current streak: {weekly_metrics['streak']} days\n"
+    report += f"* Total time invested: {weekly_metrics['total_time_spent']} hours\n\n"
     
-    # Add insights
-    report += "\n\n"
+    # Most productive day
+    if weekly_metrics["most_productive_day"]:
+        most_productive = datetime.strptime(weekly_metrics["most_productive_day"], "%Y-%m-%d").strftime("%A")
+        report += f"## Most Productive Day: {most_productive}\n\n"
     
-    # Pick one insight
-    if metrics['insights']:
-        report += f"🌟 {metrics['insights'][0]}"
+    # Time distribution
+    report += "## Time Distribution by Category\n"
+    for category, time in sorted(weekly_metrics["time_by_category"].items(), key=lambda x: x[1], reverse=True):
+        if time > 0:
+            report += f"* {category}: {time} hours\n"
+    report += "\n"
     
-    # Add a motivational quote
-    quotes = [
-        "'Success is the sum of small efforts, repeated daily.' — James Clear",
-        "'The only way to do great work is to love what you do.' — Steve Jobs",
-        "'It's not about having time, it's about making time.' — Unknown",
-        "'Progress is impossible without change.' — George Bernard Shaw",
-        "'The secret to getting ahead is getting started.' — Mark Twain"
-    ]
+    # Areas for improvement
+    report += "## Areas for Improvement\n"
+    if weekly_metrics["completion_rate"] < 70:
+        report += "* Task completion rate is below target (70%)\n"
     
-    import random
-    report += f"\n\n{random.choice(quotes)}"
+    if weekly_metrics["total_tasks"] == 0:
+        report += "* No tasks were scheduled this week\n"
+    
+    overdue = sum(day["overdue_tasks"] for day in weekly_metrics["daily_metrics"])
+    if overdue > 0:
+        report += f"* {overdue} tasks are currently overdue\n"
+    
+    report += "\n"
+    
+    # Recommendations
+    report += "## Recommendations\n"
+    
+    if weekly_metrics["completion_rate"] < 50:
+        report += "* Consider reducing the number of daily tasks to make your goals more achievable\n"
+    
+    if weekly_metrics["streak"] > 0:
+        report += f"* Maintain your {weekly_metrics['streak']}-day streak for consistent progress\n"
+    else:
+        report += "* Try to complete at least one task every day to build momentum\n"
+    
+    low_categories = []
+    for category, time in weekly_metrics["time_by_category"].items():
+        if time < 2:  # Less than 2 hours per week
+            low_categories.append(category)
+    
+    if low_categories:
+        categories_str = ", ".join(low_categories)
+        report += f"* Allocate more time to underserved categories: {categories_str}\n"
     
     return report

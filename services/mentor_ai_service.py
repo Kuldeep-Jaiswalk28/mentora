@@ -18,7 +18,7 @@ from models import (
     TimeSlot, UserPreference
 )
 from utils.priority_engine import suggest_next_task
-from services.progress_service import get_overall_progress
+from services.progress_service import get_overall_progress, get_progress_insights
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +117,9 @@ def build_context(user_input=None):
                 'priority': suggested_task.priority
             }
     
-    # Get user progress stats
+    # Get user progress stats and insights
     progress_stats = get_overall_progress()
+    progress_insights = get_progress_insights()
     
     # Get recent interactions
     recent_messages = AIMessage.query.order_by(AIMessage.timestamp.desc()).limit(5).all()
@@ -149,6 +150,7 @@ def build_context(user_input=None):
         'time_left': time_left,
         'suggested_task': suggested_task,
         'progress_stats': progress_stats,
+        'progress_insights': progress_insights,
         'recent_interactions': recent_interactions,
         'user_preferences': user_preferences,
         'user_input': user_input

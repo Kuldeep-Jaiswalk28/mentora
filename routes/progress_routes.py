@@ -7,6 +7,7 @@ from utils.progress_engine import (
     get_nudge_for_current_status,
     generate_weekly_report
 )
+from services.progress_service import get_progress_insights
 
 progress_bp = Blueprint('progress', __name__, url_prefix='/api/progress')
 
@@ -91,3 +92,10 @@ def get_streak():
         "streak": metrics["streak"],
         "streak_text": f"{metrics['streak']} day{'s' if metrics['streak'] != 1 else ''} streak"
     })
+
+@progress_bp.route('/insights', methods=['GET'])
+def get_insights():
+    """Get intelligent insights about progress patterns"""
+    insights = get_progress_insights()
+    
+    return jsonify(insights)
