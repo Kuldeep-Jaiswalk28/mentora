@@ -97,6 +97,8 @@ with app.app_context():
     from routes.reminder_routes import reminders_bp
     from routes.blueprint_routes import blueprint_bp
     from routes.mentor_routes import mentor_bp
+    from routes.progress_routes import progress_bp
+    from routes.reward_routes import reward_bp
 
     app.register_blueprint(goals_bp)
     app.register_blueprint(tasks_bp)
@@ -104,9 +106,15 @@ with app.app_context():
     app.register_blueprint(reminders_bp)
     app.register_blueprint(blueprint_bp)
     app.register_blueprint(mentor_bp)
+    app.register_blueprint(progress_bp)
+    app.register_blueprint(reward_bp)
 
     # Initialize reminder scheduler
     from utils.reminder_scheduler import initialize_reminders
     initialize_reminders(scheduler)
+    
+    # Initialize progress tracking scheduler
+    from utils.progress_scheduler import initialize_progress_tracking
+    initialize_progress_tracking(scheduler)
 
     logger.info("Mentora backend started successfully")
