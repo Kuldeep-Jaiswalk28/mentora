@@ -1,0 +1,127 @@
+Design the Mentora application’s Premade Task Scheduling Engine based entirely on the user's master blueprint. This engine must not rely on or allow any manual task input from the user. Instead, it should automatically load, schedule, and execute all tasks according to a deeply pre-defined goal structure covering categories like Class 11 Study, AI Tools, Freelancing, Certifications, and Long-Term Career Planning.
+
+The scheduling engine must be smart, self-adjusting, and built for absolute autonomy. Follow these detailed requirements:
+
+1. Blueprint Import Mechanism
+Assume there is a structured blueprint.json file containing all goal-based tasks, categorized with:
+
+Category (e.g., Class 11, Freelancing, AI Tools)
+
+Task Name
+
+Estimated Duration
+
+Preferred Time Blocks
+
+Days of Week
+
+Importance Level
+
+Dependencies (e.g., “Finish HTML Basics before React”)
+
+Sample format:
+
+json
+Copy
+Edit
+{
+  "Class 11": [
+    { "name": "Physics Ch1 - Laws of Motion", "duration": 50, "preferred_time": "morning", "days": ["Mon", "Wed", "Fri"], "importance": "high", "depends_on": [] },
+    { "name": "Maths - Trigonometry", "duration": 60, "preferred_time": "afternoon", "days": ["Tue", "Thu"], "importance": "medium", "depends_on": [] }
+  ],
+  "AI Tools": [
+    { "name": "Explore Replit Agents", "duration": 45, "preferred_time": "evening", "days": ["Mon", "Thu"], "importance": "medium", "depends_on": [] }
+  ]
+}
+Load and parse this file into a structured memory object or database on app start.
+
+2. Intelligent Time-Block Allocation
+Based on the blueprint, automatically map tasks into a weekly calendar, assigning time slots without overlap.
+
+Morning block: 6 AM – 12 PM
+
+Afternoon: 12 PM – 5 PM
+
+Evening: 5 PM – 10 PM
+
+Honor task preferences (preferred_time, days, duration) when placing them.
+
+Avoid stacking too many high-intensity tasks in a row.
+
+Leave 10–15 min break buffers between tasks automatically.
+
+3. Auto-Generated Daily Timetable (No User Input)
+Generate a dynamic daily schedule view like:
+
+makefile
+Copy
+Edit
+📅 Monday, May 19
+09:00 – 09:50  ✅ Physics Ch1 - Laws of Motion
+11:00 – 12:00  🧠 Learn Cursor AI Features
+14:00 – 15:00  🎨 Freelance Logo Revision
+17:00 – 17:45  🤖 Explore Replit Agents
+19:00 – 20:00  📚 Class 11 Chemistry Notes
+Render this in the UI as:
+
+Checklist with “Mark as Done” buttons
+
+Option to “Snooze Task” for auto-rescheduling (once per task)
+
+Progress bars per day and per week (linked to Prompt 4 metrics)
+
+4. Resilience & Smart Recovery
+If a task is missed, do NOT delete it.
+
+Automatically:
+
+Reschedule for next available slot
+
+Log it in progress tracker as Missed
+
+Notify the AI agent so it can react appropriately (see Prompt 3)
+
+Allow Mentora to shuffle lower-priority tasks to fit in missed high-priority ones.
+
+5. Goal Coverage & Balance
+Ensure weekly schedule reflects balance across all blueprint categories.
+
+Avoid overloading any one area.
+
+Maintain ratio logic:
+
+Class 11 = 40%
+
+Certifications = 20%
+
+Freelancing = 20%
+
+AI/Tech = 10%
+
+Career Planning = 10%
+
+If blueprint gets updated (e.g., new goals), engine must regenerate future schedules based on the new data structure.
+
+6. Architecture & Flow
+Core scheduling engine should live in scheduleEngine.ts.
+
+Flow:
+
+Load blueprint.json → parse goals/tasks.
+
+Map all tasks to time blocks using preferences.
+
+Generate full weekly/daily schedule objects.
+
+Pass schedules to UI + progressTracker.ts (Prompt 4).
+
+Expose schedule data to AI Agent for context-aware mentoring.
+
+7. Future Enhancements (Optional for later prompts)
+Add support for:
+
+Multi-week planning
+
+Smart detection of user fatigue (e.g., based on many missed tasks)
+
+Dynamic AI rebalancing (Mentora adjusts intensity per week)
