@@ -99,6 +99,7 @@ with app.app_context():
     from routes.mentor_routes import mentor_bp
     from routes.progress_routes import progress_bp
     from routes.reward_routes import reward_bp
+    from routes.schedule_routes import schedule_bp
 
     app.register_blueprint(goals_bp)
     app.register_blueprint(tasks_bp)
@@ -108,6 +109,7 @@ with app.app_context():
     app.register_blueprint(mentor_bp)
     app.register_blueprint(progress_bp)
     app.register_blueprint(reward_bp)
+    app.register_blueprint(schedule_bp)
 
     # Initialize reminder scheduler
     from utils.reminder_scheduler import initialize_reminders
@@ -116,5 +118,20 @@ with app.app_context():
     # Initialize progress tracking scheduler
     from utils.progress_scheduler import initialize_progress_tracking
     initialize_progress_tracking(scheduler)
+    
+    # Initialize the scheduling engine
+    from services.blueprint_import_service import load_blueprint_file, import_blueprint_to_database
+    from services.schedule_engine import regenerate_schedule
+    
+    # Import any existing blueprint and generate schedule
+    try:
+        logger.info("Initializing scheduling engine...")
+        blueprint_data = load_blueprint_file()
+        if blueprint_data:
+            import_blueprint_to_database(blueprint_data)
+            regenerate_schedule()
+        logger.info("Scheduling engine initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing scheduling engine: {str(e)}")
 
     logger.info("Mentora backend started successfully")

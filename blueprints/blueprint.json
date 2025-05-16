@@ -1,0 +1,123 @@
+{
+  "Class 11": [
+    {
+      "name": "Physics Ch1 - Laws of Motion",
+      "duration": 50,
+      "preferred_time": "morning",
+      "days": [
+        "Mon",
+        "Wed",
+        "Fri"
+      ],
+      "importance": "high",
+      "depends_on": []
+    },
+    {
+      "name": "Maths - Trigonometry",
+      "duration": 60,
+      "preferred_time": "afternoon",
+      "days": [
+        "Tue",
+        "Thu"
+      ],
+      "importance": "medium",
+      "depends_on": []
+    },
+    {
+      "name": "Chemistry - Periodic Table",
+      "duration": 45,
+      "preferred_time": "morning",
+      "days": [
+        "Mon",
+        "Thu"
+      ],
+      "importance": "high",
+      "depends_on": []
+    }
+  ],
+  "AI Tools": [
+    {
+      "name": "Explore Replit Agents",
+      "duration": 45,
+      "preferred_time": "evening",
+      "days": [
+        "Mon",
+        "Thu"
+      ],
+      "importance": "medium",
+      "depends_on": []
+    },
+    {
+      "name": "Learn Cursor AI Features",
+      "duration": 60,
+      "preferred_time": "morning",
+      "days": [
+        "Tue",
+        "Fri"
+      ],
+      "importance": "medium",
+      "depends_on": []
+    }
+  ],
+  "Freelancing": [
+    {
+      "name": "Portfolio Website Update",
+      "duration": 90,
+      "preferred_time": "afternoon",
+      "days": [
+        "Wed",
+        "Sat"
+      ],
+      "importance": "high",
+      "depends_on": []
+    },
+    {
+      "name": "Client Meeting Prep",
+      "duration": 30,
+      "preferred_time": "evening",
+      "days": [
+        "Tue"
+      ],
+      "importance": "high",
+      "depends_on": []
+    }
+  ],
+  "Certifications": [
+    {
+      "name": "AWS Cloud Practitioner Study",
+      "duration": 60,
+      "preferred_time": "afternoon",
+      "days": [
+        "Mon",
+        "Wed",
+        "Fri"
+      ],
+      "importance": "medium",
+      "depends_on": []
+    }
+  ],
+  "Career Planning": [
+    {
+      "name": "Research University Options",
+      "duration": 45,
+      "preferred_time": "evening",
+      "days": [
+        "Sun"
+      ],
+      "importance": "medium",
+      "depends_on": []
+    },
+    {
+      "name": "Update 5-Year Plan Document",
+      "duration": 60,
+      "preferred_time": "evening",
+      "days": [
+        "Sat"
+      ],
+      "importance": "low",
+      "depends_on": [
+        "Research University Options"
+      ]
+    }
+  ]
+}
