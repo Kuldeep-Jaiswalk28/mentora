@@ -245,14 +245,15 @@ function loadGoals() {
     fetch('/api/goals')
         .then(response => response.json())
         .then(data => {
-            appState.goals = data.goals;
+            // API returns an array directly, not nested under a 'goals' property
+            appState.goals = data;
             
             // Populate goal dropdown in the add task form
             const goalSelect = document.getElementById('task-goal');
             if (goalSelect) {
                 let options = '<option value="" disabled selected>Select a goal</option>';
                 
-                data.goals.forEach(goal => {
+                data.forEach(goal => {
                     options += `<option value="${goal.id}">${goal.title}</option>`;
                 });
                 
